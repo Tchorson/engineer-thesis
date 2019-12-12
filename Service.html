@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Blind people leading user interface</title>
+    <style>
+        #map {
+            width: 2000px;
+            height: 950px;
+            background-color: grey;
+        }
+
+        #lat, #long {
+            color: white;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+</head>
+<body bgcolor="black">
+<div id="floating-panel">
+    <b id="lat">Latitude: </b>
+    <input type="text" id="latitude"/>
+    <b id="long"> Longitude: </b>
+    <input type="text" id="longitude"/>
+    <input type="submit" name="submit" onclick="calculateAndDisplayRoute(directionsService,directionsRenderer)"/>
+    <button onclick="getArduinoCoordinates()">Check user location</button>
+</div>
+<div id="map"></div>
+<script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzZC5Hjh0p2GUDTv_qKVo4SflyQ2fJTRs&callback=init">
+</script>
+<script>
+    var directionsService;
+    var directionsRenderer;
+    var userCoordinates = null;
+    var currentNumber = null;
+    var map;
+    var oldLat = null;
+    var oldLng = null;
+    let newLat = null;
+    let newLng = null;
+
+    function init() {
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer();
+        var initialCoordinates = {lat: 50.0821844, lng: 20.0264001};
+        map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 17,
+            center: initialCoordinates
+        });
+        directionsRenderer.setMap(map);
+        google.maps.event.addListener(map, 'click', function (event) {
+            document.getElementById('latitude').value = event.latLng.lat();
+            document.getElementById('longitude').value = event.latLng.lng();
+        });
+    }
+
+    function getArduinoCoordinates() {
+        $.ajax({
+            type: "GET",
+            url: "/check",
+            async: false,
+            contentType: "application/json",
+            success: function (decodedJson) {
+                console.log("Received coordinates: " + decodedJson.clientCoordinates + " from user: " + decodedJson.id);
+                if (decodedJson.clientCoordinates === "")
+                    window.alert('Arduino did not sent coordinates yet');
+                else {
+                    newLat = decodedJson.clientCoordinates.split(',')[0] * 1.0;
+                    newLng = decodedJson.clientCoordinates.split(',')[1] * 1.0;
+                    if (Math.abs(newLat - oldLat) < 0.00014 && Math.abs(newLng - oldLng) < 0.00014 && decodedJson.id === currentNumber && oldLat !== null && oldLng !== null)
+                        window.alert('Arduino is still in the same area');
+                    else {
+                        userCoordinates = decodedJson.clientCoordinates;
+                        oldLat = userCoordinates.split(',')[0] * 1.0;
+                        oldLng = userCoordinates.split(',')[1] * 1.0;
+                        currentNumber = decodedJson.id;
+                    }
+                }
+            }
+        });
+    }
+
+    function calculateAndDisplayRoute(directionsService, directionsRenderer) {
+        let targetLatitude = null;
+        let targetLongitude = null;
+        if (document.getElementById('latitude').value !== '' && document.getElementById('longitude').value !== '') {
+            targetLatitude = document.getElementById('latitude').value;
+            targetLongitude = document.getElementById('longitude').value;
+        }
+        else
+            window.alert('Empty target coordinates');
+        console.log("origin: " + userCoordinates + "\n destination: " + targetLatitude + "," + targetLongitude + " user: " + currentNumber);
+        directionsService.route(
+            {
+                origin: new google.maps.LatLng(userCoordinates.split(',')[0] * 1.0, userCoordinates.split(',')[1] * 1.0),
+                destination: new google.maps.LatLng(targetLatitude * 1.0, targetLongitude * 1.0),
+                travelMode: google.maps.TravelMode.WALKING,
+            },
+            function (response, status) {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    let xhr = new XMLHttpRequest();
+                    xhr.open("POST", "/respond", true);
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.send(JSON.stringify({"route": response.routes[0].legs[0].steps, "id": currentNumber}));
+                    directionsRenderer.setDirections(response);
+                } else
+                    window.alert('Directions request failed due to ' + status);
+            }
+        );
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "engineer-thesis-agh",
+  "version": "1.0.0",
+  "description": "server for creating route and handling arduino requests",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "Mateusz Tchorek",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "latest",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "mongodb": "^3.3.4",
+    "xmlhttprequest": "^1.8.0"
+  }
+}
