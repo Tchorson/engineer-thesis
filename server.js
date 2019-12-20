@@ -112,7 +112,7 @@ function extractJsonToCoordinatesArray(routeArray,user) { // convert json to obj
     var coordinatesArray = [];
     coordinatesArray.push(routeArray[0].start_location.lat.toFixed(6) + "," + routeArray[0].start_location.lng.toFixed(6));
     for (let i = 0; i < routeArray.length; i++)
-        coordinatesArray.push(routeArray[i].end_location.lat + "," + routeArray[i].end_location.lng)
+        coordinatesArray.push(routeArray[i].end_location.lat.toFixed(6) + "," + routeArray[i].end_location.lng.toFixed(6))
     routePointsArray = coordinatesArray;
     console.log("Setting route for user: " + currentUser + " \n" + coordinatesArray);
     routesCollection.updateOne(
