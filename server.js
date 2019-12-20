@@ -1,4 +1,3 @@
-require('dotenv').config();
 const MongoClient = require('mongodb').MongoClient;
 const express = require('express');
 const app = express();
@@ -111,7 +110,7 @@ app.get('/get', (req, res) => { //send to arduino 2d coordinates array
 
 function extractJsonToCoordinatesArray(routeArray,user) { // convert json to object array
     var coordinatesArray = [];
-    coordinatesArray.push(routeArray[0].start_location.lat + "," + routeArray[0].start_location.lng);
+    coordinatesArray.push(routeArray[0].start_location.lat.toFixed(6) + "," + routeArray[0].start_location.lng.toFixed(6));
     for (let i = 0; i < routeArray.length; i++)
         coordinatesArray.push(routeArray[i].end_location.lat + "," + routeArray[i].end_location.lng)
     routePointsArray = coordinatesArray;
@@ -123,7 +122,7 @@ function extractJsonToCoordinatesArray(routeArray,user) { // convert json to obj
 }
 
 app.get('/', function (req, res) {
-    res.sendFile(path.join(__dirname + '/Service.html'));
+    res.sendFile(path.join(__dirname + '/index.html'));
 });
 
 const PORT = process.env.PORT || 80;
