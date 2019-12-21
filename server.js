@@ -93,8 +93,8 @@ app.get('/get', (req, res) => { //send to arduino 2d coordinates array
     routesCollection.find({"number": currentUser}).next().then(routeArray => {
         routePointsArray = routeArray.route;
         var coordinatesToSend = [];
-        var amountOfCoordinates = routePointsArray.length > 15 ? 15 : routePointsArray.length;
-        var restOfCoordinates = 15 - amountOfCoordinates;
+        var amountOfCoordinates = routePointsArray.length > 10 ? 10 : routePointsArray.length;
+        var restOfCoordinates = 10 - amountOfCoordinates;
 
         for (i = 0; i < amountOfCoordinates; i++) {
             let stringCoordinates = routePointsArray.shift().split(",");
