@@ -93,8 +93,8 @@ app.get('/get', (req, res) => { //send to arduino 2d coordinates array
     routesCollection.find({"number": currentUser}).next().then(routeArray => {
         routePointsArray = routeArray.route;
         var coordinatesToSend = [];
-        var amountOfCoordinates = routePointsArray.length > 20 ? 20 : routePointsArray.length;
-        var restOfCoordinates = 20 - amountOfCoordinates;
+        var amountOfCoordinates = routePointsArray.length > 15 ? 15 : routePointsArray.length;
+        var restOfCoordinates = 15 - amountOfCoordinates;
 
         for (i = 0; i < amountOfCoordinates; i++) {
             let stringCoordinates = routePointsArray.shift().split(",");
@@ -112,7 +112,7 @@ function extractJsonToCoordinatesArray(routeArray,user) { // convert json to obj
     var coordinatesArray = [];
     coordinatesArray.push(routeArray[0].start_location.lat.toFixed(6) + "," + routeArray[0].start_location.lng.toFixed(6));
     for (let i = 0; i < routeArray.length; i++)
-        coordinatesArray.push(routeArray[i].end_location.lat.toFixed(6) + "," + routeArray[i].end_location.lng.toFixed(6))
+        coordinatesArray.push(routeArray[i].end_location.lat.toFixed(7) + "," + routeArray[i].end_location.lng.toFixed(7))
     routePointsArray = coordinatesArray;
     console.log("Setting route for user: " + currentUser + " \n" + coordinatesArray);
     routesCollection.updateOne(
