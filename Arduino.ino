@@ -6,16 +6,15 @@
 #define PHONE_NUMBER  "530093017"
 DFRobot_SIM808 sim808(&Serial);
 MechaQMC5883 qmc;
-char buffer[380];
+char buffer[360];
 byte counter = 0;
 byte coordinatesMaxAmount = 10;
-float coordinatesArray[10][2];
+float coordinatesArray[10][2]; //latitude lo
 char url[] = "sendzimir.metal.agh.edu.pl";
 char http_route[] = "GET /~mtchorek/route.php HTTP/1.0\r\n\r\n";
 char http_get[] = "GET /~mtchorek/get.php HTTP/1.0\r\n\r\n";
-char http_loc[96] = "GET /~mtchorek/send.php?type=location&id=502261249&latlang=";
-char http_del[91] = "GET /~mtchorek/send.php?type=del&id=502261249&latlang=";
-char http_suffix[] = " HTTP/1.0\r\n\r\n";
+char http_loc[] = "GET /~mtchorek/send.php?type=location&id=502261249&latlang=00.00000,00.00000 HTTP/1.0\r\n\r\n";
+char http_del[] = "GET /~mtchorek/send.php?type=del&id=502261249&latlang=00.00000,00.00000 HTTP/1.0\r\n\r\n";
 
 void initialize_qmc() {
   qmc.init(); //initialize compass library in case of electronic malfunctions
@@ -37,21 +36,19 @@ void clearOrInitializeCoordinatesArray(byte index = 99) {
 }
 
 void fillLocationUrl(String latlang) {
-  byte b;
-  for ( b = 59; b < 78; b++) {
-    http_loc[b] = latlang[b - 59];
-  }
-  for (b = 78; b < 95; b++) {
-    http_loc[b] = http_suffix[b - 78];
+  char * local;
+  local = strstr (http_loc,"latlang=");
+  
+  for (byte b = 8;b<25;b++){
+    local[b]=latlang[b-8];
   }
 }
 void fillDeleteUrl(String latlang) {
-  byte b;
-  for ( b = 54; b < 73; b++) {
-    http_del[b] = latlang[b - 54];
-  }
-  for (b = 73; b < 90; b++) {
-    http_del[b] = http_suffix[b - 73];
+  char * local;
+  local = strstr (http_del,"latlang=");
+  
+  for (byte b = 8;b<25;b++){
+    local[b]=latlang[b-8];
   }
 }
 
@@ -75,6 +72,7 @@ void disconnectFromInternet() {
 // 50.0822292;latitude N/S 20.0264915;longitude W/E
 bool routeRequest() {
   connectToInternet();
+  Serial.println("routeRequest");
   sim808.send(http_route, sizeof(http_route) - 1);
   while (true) {
     short ret = sim808.recv(buffer, (short)sizeof(buffer) - 1);
@@ -85,10 +83,12 @@ bool routeRequest() {
     break;
   }
   if (strstr(buffer, 'true')) {
+    Serial.println("true");
     disconnectFromInternet();
     return true;
   }
   else {
+    Serial.println("false");
     disconnectFromInternet();
     return false;
   }
@@ -96,7 +96,6 @@ bool routeRequest() {
 
 void getRoute() {
   connectToInternet();
-
   sim808.send(http_get, sizeof(http_get) - 1);
   while (true) {
     short ret = sim808.recv(buffer, (short)sizeof(buffer) - 1);
@@ -133,9 +132,7 @@ void getRoute() {
       }
       coordinate[coordinateIndex]=pch[index];
       coordinateIndex++;
-//      Serial.print(pch[index]);
     }
-  
   disconnectFromInternet();
 }
 
@@ -147,26 +144,20 @@ byte getSize(char* ch){
       }return tmp;}
 
 void sendCoordinates(){
-  connectToInternet();
-  //char coordinates[22];
-  
+  connectToInternet();  
   while (true) {
     if (sim808.getGPS()) {
       break;
     }
   }
-  Serial.print("glat: ");
   float gpsLatitude = sim808.GPSdata.lat; // poziomo N/S
-  Serial.print(gpsLatitude, 6);
   float gpsLongitude = sim808.GPSdata.lon; //pionowo W/E
-  Serial.print(" glng: ");
-  Serial.println(gpsLongitude, 6);
   sim808.detachGPS();
 
   String coordinates;
-  coordinates+=String(gpsLatitude,6);
+  coordinates+=String(gpsLatitude,5);
   coordinates+=F(",");
-  coordinates+=String(gpsLongitude,6);
+  coordinates+=String(gpsLongitude,5);
 
   fillLocationUrl(coordinates);
 
@@ -184,6 +175,7 @@ void sendCoordinates(){
 
 void initializeOrGetRoute() {
   //request to server
+  Serial.println("initializeOrGetRoute");
   if (!routeRequest())
   {
     sim808.callUp(PHONE_NUMBER);
@@ -194,7 +186,6 @@ void initializeOrGetRoute() {
     sendCoordinates();
     delay(15000);
   }
-
   getRoute();
 }
 
@@ -205,9 +196,8 @@ void setup() {
   while (!sim808.init()) {
     delay(1000);
   }
-  if ( sim808.attachGPS()) {
-    Serial.println("GPS");
-  }
+  delay(3000);
+  sim808.attachGPS();
   clearOrInitializeCoordinatesArray();
   initializeOrGetRoute();
 }
@@ -219,98 +209,120 @@ void loop() {
   targetLatitude = coordinatesArray[counter][0];
 
   unsigned short compassCounter = 0;
-  initializeOrGetRoute();
-
-  while (coordinatesArray[counter % coordinatesMaxAmount][1] != 0 && coordinatesArray[counter % coordinatesMaxAmount][0] != 0 )
+    if (routeRequest())
   {
-    while (true) {
-      if (sim808.getGPS()) {
-        break;
+ // initializeOrGetRoute();
+    getRoute();
+    delay(50);
+    while (coordinatesArray[counter % coordinatesMaxAmount][1] != 0.0 && coordinatesArray[counter % coordinatesMaxAmount][0] != 0.0 )
+    {
+      while (true) {
+        if (sim808.getGPS()) {
+          break;
+        }
+      }
+      //Serial.print("glat: ");
+      gpsLatitude = sim808.GPSdata.lat; // poziomo N/S
+      //Serial.print(gpsLatitude, 5);
+      //Serial.print(" glng: ");
+      gpsLongitude = sim808.GPSdata.lon; //pionowo W/E
+      //Serial.println(gpsLongitude, 5);
+  
+      sim808.detachGPS();
+      targetDeclination = atan2(targetLongitude - gpsLongitude, targetLatitude - gpsLatitude) * ( 180.0 / M_PI );
+  
+      while (compassCounter < 65530 ) {
+        if (compassCounter % 2000 == 0) {
+          qmc.read(&x, &y, &z);
+          userDeclination = atan2(x, y) * ( 180.0 / M_PI );
+  
+          if (x == 0 && y == 0 && z == 0 || x == -1 && y == -1 && z == -1) {
+            initialize_qmc();
+          }
+          //create logic for aiming user to correct direction
+          if ( userDeclination > -22.5 && userDeclination <= 22.5) {
+            Serial.println("N" );
+          }
+          if ( userDeclination > 22.5 && userDeclination <= 67.5) {
+            Serial.println("NW ");
+          }
+          if ( userDeclination > 67.5 && userDeclination <= 112.5) {
+            Serial.println("W ");
+          }
+          if ( userDeclination > 112.5 && userDeclination <= 157.5) {
+            Serial.println("SW ");
+          }
+          if ( userDeclination <= -157.5 || userDeclination > 157.5) {
+            Serial.println("S ");
+          }
+          if ( userDeclination <= -112.5 && userDeclination > -157.5) {
+            Serial.println("SE ");
+          }
+          if ( userDeclination <= -67.5 && userDeclination > -112.5) {
+            Serial.println("E ");
+          }
+          if ( userDeclination <= -22.5 && userDeclination > -67.5) {
+            Serial.println("NE ");
+          }
+  
+          Serial.print(targetDeclination - userDeclination);
+          Serial.print(" ");
+          Serial.print(targetDeclination);
+          Serial.print(" ");
+          Serial.println(userDeclination);
+          if ( abs(targetDeclination - userDeclination) >= abs(targetDeclination - userDeclination - 360) && abs(targetDeclination - userDeclination + 360) >= abs(targetDeclination - userDeclination - 360)) {
+            Serial.println("L");
+            //Left engine vibrates
+          }
+          if ( abs(targetDeclination - userDeclination) >= abs(targetDeclination - userDeclination + 360) && abs(targetDeclination - userDeclination - 360) >= abs(targetDeclination - userDeclination + 360) ) {
+            Serial.println("R");
+            // right engine vibrates
+          }
+          if ( abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination - 360) && abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination + 360) && targetDeclination - userDeclination > 0) {
+            // right engine vibrates
+            Serial.println("R");
+          }
+          if ( abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination - 360) && abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination + 360) && targetDeclination - userDeclination < 0) {
+            Serial.println("L");
+            // left engine vibrates
+          }
+        }
+        compassCounter++;
+      }
+      compassCounter = 0;
+      if ( fabs(targetLongitude - gpsLongitude) < 0.00007 && fabs(targetLatitude - gpsLatitude) < 0.00007 ) {
+        String coordinates;
+        coordinates+=String(coordinatesArray[counter][0],5);
+        coordinates+=F(",");
+        coordinates+=String(coordinatesArray[counter][1],5);
+        coordinatesArray[counter][1] = 0.0;
+        coordinatesArray[counter][0] = 0.0;
+        connectToInternet();
+
+        fillDeleteUrl(coordinates);
+        sim808.send(http_del, sizeof(http_del) - 1);
+        
+        while (true) {
+          short ret = sim808.recv(buffer, (short)sizeof(buffer) - 1);
+          if (ret <= 0) {
+            break;
+          }
+          buffer[ret] = '\0';
+          break;
+        }
+        disconnectFromInternet();
+        
+        counter++;
+        if (counter == coordinatesMaxAmount) {
+          counter = 0;
+        }
+        targetLongitude = coordinatesArray[counter][1];
+        targetLatitude = coordinatesArray[counter][0];
       }
     }
-    Serial.print("glat: ");
-    gpsLatitude = sim808.GPSdata.lat; // poziomo N/S
-    Serial.print(gpsLatitude, 6);
-    Serial.print(" glng: ");
-    gpsLongitude = sim808.GPSdata.lon; //pionowo W/E
-    Serial.println(gpsLongitude, 6);
-
-    sim808.detachGPS();
-    Serial.print(" tDecl: ");
-    targetDeclination = atan2(targetLongitude - gpsLongitude, targetLatitude - gpsLatitude) * ( 180.0 / M_PI );
-    Serial.println(targetDeclination, 7);
-
-    while (compassCounter < 65530 ) {
-      if (compassCounter % 2000 == 0) {
-        qmc.read(&x, &y, &z);
-        userDeclination = atan2(x, y) * ( 180.0 / M_PI );
-
-        if (x == 0 && y == 0 && z == 0 || x == -1 && y == -1 && z == -1) {
-          initialize_qmc();
-        }
-        //create logic for aiming user to correct direction
-        if ( userDeclination > -22.5 && userDeclination <= 22.5) {
-          Serial.print("N" );
-        }
-        if ( userDeclination > 22.5 && userDeclination <= 67.5) {
-          Serial.print("NW ");
-        }
-        if ( userDeclination > 67.5 && userDeclination <= 112.5) {
-          Serial.print("W ");
-        }
-        if ( userDeclination > 112.5 && userDeclination <= 157.5) {
-          Serial.print("SW ");
-        }
-        if ( userDeclination <= -157.5 || userDeclination > 157.5) {
-          Serial.print("S ");
-        }
-        if ( userDeclination <= -112.5 && userDeclination > -157.5) {
-          Serial.print("SE ");
-        }
-        if ( userDeclination <= -67.5 && userDeclination > -112.5) {
-          Serial.print("E ");
-        }
-        if ( userDeclination <= -22.5 && userDeclination > -67.5) {
-          Serial.print("NE ");
-        }
-
-        Serial.print(targetDeclination - userDeclination);
-        Serial.print(" ");
-        Serial.print(targetDeclination);
-        Serial.print(" ");
-        Serial.println(userDeclination);
-        if ( abs(targetDeclination - userDeclination) >= abs(targetDeclination - userDeclination - 360) && abs(targetDeclination - userDeclination + 360) >= abs(targetDeclination - userDeclination - 360)) {
-          Serial.println("L");
-          //Left engine vibrates
-        }
-        if ( abs(targetDeclination - userDeclination) >= abs(targetDeclination - userDeclination + 360) && abs(targetDeclination - userDeclination - 360) >= abs(targetDeclination - userDeclination + 360) ) {
-          Serial.println("R");
-          // right engine vibrates
-        }
-        if ( abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination - 360) && abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination + 360) && targetDeclination - userDeclination > 0) {
-          // right engine vibrates
-          Serial.println("R");
-        }
-        if ( abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination - 360) && abs(targetDeclination - userDeclination) <= abs(targetDeclination - userDeclination + 360) && targetDeclination - userDeclination < 0) {
-          Serial.println("L");
-          // left engine vibrates
-        }
-      }
-      compassCounter++;
-    }
-    compassCounter = 0;
-    if ( fabs(targetLongitude - gpsLongitude) < 0.00007 && fabs(targetLatitude - gpsLatitude) < 0.00007 ) {
-      Serial.println("N");
-      coordinatesArray[counter][1] = 0;
-      coordinatesArray[counter][0] = 0;
-      // send coordinates' counter that will be set to 0 in server
-      counter++;
-      if (counter == coordinatesMaxAmount) {
-        counter = 0;
-      }
-      targetLongitude = coordinatesArray[counter][1];
-      targetLatitude = coordinatesArray[counter][0];
+  }else {
+    while(true){
+        //vibrate middle engine constantly 
     }
   }
-  Serial.println("End");
 }
