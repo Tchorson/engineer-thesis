@@ -49,9 +49,27 @@ app.post('/respond', (req, res) => { // receive route
 
 // /del?id=502261249&latlang=50.0331315,20.123567
 app.get('/del', (req, res) => { //remove single coordinate when user reach destination point
+    if(req.query.latlang.length <17){
+        var tmp = req.query.latlang.split(",");
+        console.log(tmp[0].length);
+        if (tmp[0].length<8){
+            for(let size = tmp[0].length; size<9;size++){
+                tmp[0]+="0";
+            }
+        }
+        if (tmp[1].length<8){
+            for(let size = tmp[1].length; size<9;size++){
+                tmp[1]+="0";
+            }
+        }
+        var latlang = tmp[0]+","+tmp[1];
+    }else{
+        var latlang = req.query.latlang;
+    }
+
     routesCollection.update({"number": req.query.id * 1},
         {
-            "$pull": {"route": req.query.latlang}
+            "$pull": {"route": latlang}
         }).then(answer => {
             if (answer.result.n*1 > 0)    console.log("Removed coordinates: " + req.query.latlang + " for user: " + req.query.id);
             else console.log("Coordinates: " + req.query.latlang + " for user: " + req.query.id+" has not been removed");
