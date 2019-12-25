@@ -173,9 +173,7 @@ byte getSize(char* ch){
   coordinates+=String(gpsLatitude,5);
   coordinates+=F(",");
   coordinates+=String(gpsLongitude,5);
-
   fillLocationUrl(coordinates);
-
   sim808.send(http_loc, sizeof(http_loc) - 1);
   while (true) {
     short ret = sim808.recv(buffer, (short)sizeof(buffer) - 1);
@@ -208,8 +206,8 @@ void initializeOrGetRoute() {
       if(sim808.getGPS())
         break;
     }
-    float gpsLatitude = 50.08031;
-    float gpsLongitude =20.0265;
+    float gpsLatitude = sim808.GPSdata.lat; 
+    float gpsLongitude = sim808.GPSdata.lon;
     sim808.detachGPS();
 
     if ( fabs(coordinatesArray[0][0] - gpsLatitude) > 0.00012 || fabs(coordinatesArray[0][1] - gpsLongitude) > 0.00012 ) {
@@ -222,9 +220,7 @@ void initializeOrGetRoute() {
       delay(20000);
       getRoute();
     }
-    else{
-      Serial.println("Continuing");
-      }
+    else Serial.println("Continuing");
   }
 }
 
@@ -264,18 +260,25 @@ void loop() {
         }
         Serial.print("glat: ");
         gpsLatitude = sim808.GPSdata.lat; // poziomo N/S
+
         Serial.print(gpsLatitude, 5);
+        
         Serial.print(" glng: ");
         gpsLongitude = sim808.GPSdata.lon; //pionowo W/E
         Serial.println(gpsLongitude, 5);
+        Serial.print(" trglat: ");
+        Serial.print(targetLatitude);
+        Serial.print(" trglng: ");
+        Serial.print(targetLongitude);
         sim808.detachGPS();
         targetAzimuth = atan2(targetLongitude - gpsLongitude, targetLatitude - gpsLatitude) * ( 180.0 / M_PI );
 
-
-        if ( fabs(targetLongitude - gpsLongitude) < 0.00011 && fabs(targetLatitude - gpsLatitude) < 0.00011 ) {
+        if ( fabs(targetLongitude - gpsLongitude) < 0.00008 && fabs(targetLatitude - gpsLatitude) < 0.00008 ) {
           Serial.println("deleting");
           delay(100);
+          digitalWrite(left, LOW);
           digitalWrite(middle, HIGH);
+          digitalWrite(right, LOW);
           String coordinates;
           coordinates+=String(coordinatesArray[counter][0],5);
           coordinates+=F(",");
@@ -302,8 +305,7 @@ void loop() {
           }
           targetLongitude = coordinatesArray[counter][1];
           targetLatitude = coordinatesArray[counter][0];
-        }
-        else{
+        }else{
         while (compassCounter < 65530 ) {
           if (compassCounter % 2000 == 0) {
             qmc.read(&x, &y, &z);
@@ -354,8 +356,6 @@ void loop() {
     digitalWrite(left, LOW);
     digitalWrite(middle, HIGH);
     digitalWrite(right, LOW);
-    while(true){
-         
-    }
+    while(true){}
   }
 }
