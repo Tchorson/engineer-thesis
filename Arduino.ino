@@ -85,6 +85,7 @@ bool routeRequest() {
     buffer[ret] = '\0';
     break;
   }
+  Serial.println(buffer);
   if (strstr(buffer, "true")) {
     disconnectFromInternet();
     return true;
@@ -134,7 +135,14 @@ void getRoute() {
       coordinate[coordinateIndex]=pch[index];
       coordinateIndex++;
     }
-    
+    Serial.println();
+    for(byte b =0;b<10;b++){
+      for(byte k =0;k<2;k++){
+        Serial.print(coordinatesArray[b][k],5);
+        Serial.print(" ");
+      }
+      Serial.println();
+    }
   disconnectFromInternet();
 }
 
@@ -145,9 +153,7 @@ byte getSize(char* ch){
         tmp++;
       }return tmp;}
 
-void sendCoordinates(){
-  connectToInternet(); 
-
+  void sendCoordinates(){
   while(!sim808.init()) { 
       delay(1000);
       Serial.print("Sim808 init error\r\n");
@@ -162,7 +168,7 @@ void sendCoordinates(){
   float gpsLatitude = sim808.GPSdata.lat; // poziomo N/S
   float gpsLongitude = sim808.GPSdata.lon; //pionowo W/E
   sim808.detachGPS();
-
+  connectToInternet(); 
   String coordinates;
   coordinates+=String(gpsLatitude,5);
   coordinates+=F(",");
@@ -193,8 +199,33 @@ void initializeOrGetRoute() {
     delay(100);
     sendCoordinates();
     delay(20000);
+    getRoute();
   }
-  getRoute();
+  else{
+    getRoute();
+    sim808.attachGPS();
+    while(true){
+      if(sim808.getGPS())
+        break;
+    }
+    float gpsLatitude = 50.08031;
+    float gpsLongitude =20.0265;
+    sim808.detachGPS();
+
+    if ( fabs(coordinatesArray[0][0] - gpsLatitude) > 0.00012 || fabs(coordinatesArray[0][1] - gpsLongitude) > 0.00012 ) {
+      sim808.callUp(PHONE_NUMBER);
+      sim808.callUp(PHONE_NUMBER);
+      delay(120000);
+      sim808.hangup();
+      delay(100);
+      sendCoordinates();
+      delay(20000);
+      getRoute();
+    }
+    else{
+      Serial.println("Continuing");
+      }
+  }
 }
 
 void setup() {
@@ -239,7 +270,40 @@ void loop() {
         Serial.println(gpsLongitude, 5);
         sim808.detachGPS();
         targetAzimuth = atan2(targetLongitude - gpsLongitude, targetLatitude - gpsLatitude) * ( 180.0 / M_PI );
-    
+
+
+        if ( fabs(targetLongitude - gpsLongitude) < 0.00011 && fabs(targetLatitude - gpsLatitude) < 0.00011 ) {
+          Serial.println("deleting");
+          delay(100);
+          digitalWrite(middle, HIGH);
+          String coordinates;
+          coordinates+=String(coordinatesArray[counter][0],5);
+          coordinates+=F(",");
+          coordinates+=String(coordinatesArray[counter][1],5);
+          coordinatesArray[counter][1] = 0.0;
+          coordinatesArray[counter][0] = 0.0;
+          connectToInternet();
+  
+          fillDeleteUrl(coordinates);
+          sim808.send(http_del, sizeof(http_del) - 1);
+          
+          while (true) {
+            short ret = sim808.recv(buffer, (short)sizeof(buffer) - 1);
+            if (ret <= 0) {
+              break;
+            }
+            buffer[ret] = '\0';
+            break;
+          }
+          disconnectFromInternet();
+          counter++;
+          if (counter == coordinatesMaxAmount) {
+            counter = 0;
+          }
+          targetLongitude = coordinatesArray[counter][1];
+          targetLatitude = coordinatesArray[counter][0];
+        }
+        else{
         while (compassCounter < 65530 ) {
           if (compassCounter % 2000 == 0) {
             qmc.read(&x, &y, &z);
@@ -248,37 +312,6 @@ void loop() {
             if (x == 0 && y == 0 && z == 0 || x == -1 && y == -1 && z == -1) {
               initialize_qmc();
             }
-             if ( userAzimuth > -22.5 && userAzimuth <= 22.5) {
-            Serial.println("N" );
-          }
-          if ( userAzimuth > 22.5 && userAzimuth <= 67.5) {
-            Serial.println("NW ");
-          }
-          if ( userAzimuth > 67.5 && userAzimuth <= 112.5) {
-            Serial.println("W ");
-          }
-          if ( userAzimuth > 112.5 && userAzimuth <= 157.5) {
-            Serial.println("SW ");
-          }
-          if ( userAzimuth <= -157.5 || userAzimuth > 157.5) {
-            Serial.println("S ");
-          }
-          if ( userAzimuth <= -112.5 && userAzimuth > -157.5) {
-            Serial.println("SE ");
-          }
-          if ( userAzimuth <= -67.5 && userAzimuth > -112.5) {
-            Serial.println("E ");
-          }
-          if ( userAzimuth <= -22.5 && userAzimuth > -67.5) {
-            Serial.println("NE ");
-          }
-  
-          Serial.print(targetAzimuth - userAzimuth);
-          Serial.print(" ");
-          Serial.print(targetAzimuth);
-          Serial.print(" ");
-          Serial.println(userAzimuth);
-            
             if ( abs(targetAzimuth - userAzimuth) >= abs(targetAzimuth - userAzimuth - 360) && abs(targetAzimuth - userAzimuth + 360) >= abs(targetAzimuth - userAzimuth - 360)) {
                 delay(100);
                 digitalWrite(left, HIGH);
@@ -311,47 +344,21 @@ void loop() {
                 digitalWrite(middle, LOW);
                 digitalWrite(right, LOW);
         compassCounter = 0;
-        if ( fabs(targetLongitude - gpsLongitude) < 0.00009 && fabs(targetLatitude - gpsLatitude) < 0.00009 ) {
-          delay(100);
-          digitalWrite(middle, HIGH);
-          String coordinates;
-          coordinates+=String(coordinatesArray[counter][0],5);
-          coordinates+=F(",");
-          coordinates+=String(coordinatesArray[counter][1],5);
-          coordinatesArray[counter][1] = 0.0;
-          coordinatesArray[counter][0] = 0.0;
-          connectToInternet();
-  
-          fillDeleteUrl(coordinates);
-          sim808.send(http_del, sizeof(http_del) - 1);
-          
-          while (true) {
-            short ret = sim808.recv(buffer, (short)sizeof(buffer) - 1);
-            if (ret <= 0) {
-              break;
-            }
-            buffer[ret] = '\0';
-            break;
-          }
-          disconnectFromInternet();
-          counter++;
-          if (counter == coordinatesMaxAmount) {
-            counter = 0;
-          }
-          targetLongitude = coordinatesArray[counter][1];
-          targetLatitude = coordinatesArray[counter][0];
-        }
+    }
   }
-
   if (routeRequest())
-  {
- // initializeOrGetRoute();
     getRoute();
-    delay(50);
-  }else {
+  else {
+    Serial.println("TURN OFF");
     delay(100);
+    digitalWrite(left, LOW);
+    digitalWrite(middle, HIGH);
+    digitalWrite(right, LOW);
     while(true){
-         digitalWrite(middle, HIGH);
+         
     }
   }
 }
+
+float gpsLatitude = 50.08031;
+    float gpsLongitude =20.0265;
