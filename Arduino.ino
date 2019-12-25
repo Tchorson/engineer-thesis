@@ -359,6 +359,3 @@ void loop() {
     }
   }
 }
-
-float gpsLatitude = 50.08031;
-    float gpsLongitude =20.0265;
