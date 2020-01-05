@@ -39,11 +39,13 @@
     var oldLng = null;
     let newLat = null;
     let newLng = null;
-
+	var mapCenterLat = 50.0821844; //Coordinates for testing area
+	var mapCenterLng = 20.0264001; //There is need to move map
     function init() {
         directionsService = new google.maps.DirectionsService();
         directionsRenderer = new google.maps.DirectionsRenderer();
-        var initialCoordinates = {lat: 50.0821844, lng: 20.0264001};
+        var initialCoordinates = {lat: mapCenterLat, lng: mapCenterLng};
+
         map = new google.maps.Map(document.getElementById('map'), {
             zoom: 17,
             center: initialCoordinates
@@ -61,18 +63,20 @@
             url: "/check",
             async: false,
             contentType: "application/json",
-            success: function (decodedJson) {
+            success: function (msg) {
+				let decodedJson = JSON.parse(msg);
+				let maxDistanceFromLastLocation = 0.00011;//check if user new location is too close to the previous one
                 console.log("Received coordinates: " + decodedJson.clientCoordinates + " from user: " + decodedJson.id);
                 if (decodedJson.clientCoordinates === "")
                     window.alert('Arduino did not sent coordinates yet');
                 else {
                     newLat = decodedJson.clientCoordinates.split(',')[0] * 1.0;
                     newLng = decodedJson.clientCoordinates.split(',')[1] * 1.0;
-                    if (Math.abs(newLat - oldLat) < 0.00014 && Math.abs(newLng - oldLng) < 0.00014 && decodedJson.id === currentNumber && oldLat !== null && oldLng !== null)
+                    if (Math.abs(newLat - oldLat) < maxDistanceFromLastLocation && Math.abs(newLng - oldLng) < maxDistanceFromLastLocation && decodedJson.id === currentNumber && oldLat !== null && oldLng !== null)
                         window.alert('Arduino is still in the same area');
                     else {
                         userCoordinates = decodedJson.clientCoordinates;
-                        oldLat = userCoordinates.split(',')[0] * 1.0;
+                        oldLat = userCoordinates.split(',')[0] * 1.0;//String to float conversion
                         oldLng = userCoordinates.split(',')[1] * 1.0;
                         currentNumber = decodedJson.id;
                     }
@@ -93,7 +97,7 @@
         console.log("origin: " + userCoordinates + "\n destination: " + targetLatitude + "," + targetLongitude + " user: " + currentNumber);
         directionsService.route(
             {
-                origin: new google.maps.LatLng(userCoordinates.split(',')[0] * 1.0, userCoordinates.split(',')[1] * 1.0),
+                origin: new google.maps.LatLng(userCoordinates.split(',')[0] * 1.0, userCoordinates.split(',')[1] * 1.0), //String to float conversion
                 destination: new google.maps.LatLng(targetLatitude * 1.0, targetLongitude * 1.0),
                 travelMode: google.maps.TravelMode.WALKING,
             },

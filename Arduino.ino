@@ -17,7 +17,8 @@ char http_route[] = "GET /~mtchorek/route.php HTTP/1.0\r\n\r\n";
 char http_get[] = "GET /~mtchorek/get.php HTTP/1.0\r\n\r\n";
 char http_loc[] = "GET /~mtchorek/send.php?type=location&id=502261249&latlang=00.00000,00.00000 HTTP/1.0\r\n\r\n";
 char http_del[] = "GET /~mtchorek/send.php?type=del&id=502261249&latlang=00.00000,00.00000 HTTP/1.0\r\n\r\n";
-
+int timeForCallSupport = 120000;
+unsigned short timeForRouteCreating = 20000;
 void initialize_qmc() {
   qmc.init(); //initialize compass library in case of electronic malfunctions
 }
@@ -113,14 +114,14 @@ void getRoute() {
   char coordinate[10];
   byte coordinateIndex=0;
   byte coordinatesIndex =0;
-  for(byte index=2;index<arrayLength;index++){
-      if (pch[index] == ','){
+  for(byte index=2;index<arrayLength;index++){//Start reading array elements 
+      if (pch[index] == ','){//Latitude collecting process is complete
         coordinatesArray[coordinatesIndex][0]=atof(coordinate);
         memset(coordinate, 0, (byte)sizeof(coordinate));
         coordinateIndex =0;
         continue;  
       }
-      if (pch[index] == ']'&&pch[index+1] == ','&&pch[index+2] == '['){
+      if (pch[index] == ']'&&pch[index+1] == ','&&pch[index+2] == '['){//Longitude collecting process is complete
         coordinatesArray[coordinatesIndex][1]=atof(coordinate);
         index+=2;
         coordinatesIndex++;
@@ -128,7 +129,7 @@ void getRoute() {
         coordinateIndex =0;
         continue;
       }
-      if(pch[index]== ']' && pch[index+1] == ']'){
+      if(pch[index]== ']' && pch[index+1] == ']'){//Last longitude before the end of message
         coordinatesArray[coordinatesIndex][1]=atof(coordinate);
         continue;
       }
@@ -192,15 +193,18 @@ void initializeOrGetRoute() {
   {
     sim808.callUp(PHONE_NUMBER);
     sim808.callUp(PHONE_NUMBER);
-    delay(120000);
+    delay(timeForCallSupport);
     sim808.hangup();
     delay(100);
     sendCoordinates();
-    delay(20000);
+    delay(timeForRouteCreating);
     getRoute();
   }
   else{
     getRoute();
+	float targetLongitude = coordinatesArray[0][1];
+	float targetLatitude = coordinatesArray[0][0];
+	float maxDistance = 0.00007; //Maximal distance between user and route coordinates
     sim808.attachGPS();
     while(true){
       if(sim808.getGPS())
@@ -210,14 +214,14 @@ void initializeOrGetRoute() {
     float gpsLongitude = sim808.GPSdata.lon;
     sim808.detachGPS();
 
-    if ( fabs(coordinatesArray[0][0] - gpsLatitude) > 0.00012 || fabs(coordinatesArray[0][1] - gpsLongitude) > 0.00012 ) {
+    if (fabs(targetLongitude - gpsLongitude) || fabs(targetLatitude - gpsLatitude) > maxDistance  > maxDistance ) {
       sim808.callUp(PHONE_NUMBER);
       sim808.callUp(PHONE_NUMBER);
-      delay(120000);
+      delay(timeForCallSupport);
       sim808.hangup();
       delay(100);
       sendCoordinates();
-      delay(20000);
+      delay(timeForRouteCreating);
       getRoute();
     }
     else Serial.println("Continuing");
@@ -247,7 +251,7 @@ void loop() {
   targetLongitude = coordinatesArray[counter][1];
   targetLatitude = coordinatesArray[counter][0];
   unsigned short compassCounter = 0;
-    
+  unsigned short maxTimeOfNavigating= 65530;  
     while (coordinatesArray[counter % coordinatesMaxAmount][1] != 0.0 && coordinatesArray[counter % coordinatesMaxAmount][0] != 0.0 )
     {
         while(!sim808.init()) { 
@@ -272,8 +276,8 @@ void loop() {
         Serial.print(targetLongitude);
         sim808.detachGPS();
         targetAzimuth = atan2(targetLongitude - gpsLongitude, targetLatitude - gpsLatitude) * ( 180.0 / M_PI );
-
-        if ( fabs(targetLongitude - gpsLongitude) < 0.00008 && fabs(targetLatitude - gpsLatitude) < 0.00008 ) {
+		float minDistanceBetweenPoints = 0.00007; //if distance is too close, delete current route point and lead to another 
+        if ( fabs(targetLongitude - gpsLongitude) < minDistanceBetweenPoints && fabs(targetLatitude - gpsLatitude) < minDistanceBetweenPoints ) {
           Serial.println("deleting");
           delay(100);
           digitalWrite(left, LOW);
@@ -306,7 +310,7 @@ void loop() {
           targetLongitude = coordinatesArray[counter][1];
           targetLatitude = coordinatesArray[counter][0];
         }else{
-        while (compassCounter < 65530 ) {
+        while (compassCounter <  ) {
           if (compassCounter % 2000 == 0) {
             qmc.read(&x, &y, &z);
             userAzimuth = atan2(x, y) * ( 180.0 / M_PI );
